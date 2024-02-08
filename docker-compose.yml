@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  mysql:
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    image: mysql-solo:latest
+    container_name: solo-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: solo
+      # You have to set the following environment variables
+      MYSQL_ROOT_PASSWORD: <root-password>
+      MYSQL_USER: <db-username>
+      MYSQL_PASSWORD: <db-password>
+    command: --max_allowed_packet=32505856
+    volumes:
+      - /opt/solo/mysql:/var/lib/mysql
+    networks:
+      - solo-net
+
+  solo:
+    depends_on:
+      - mysql
+    image: b3log/solo:latest
+    container_name: solo-main
+    restart: unless-stopped
+    tty: true
+    environment:
+      # Specify the runtime database.
+      # As you are using H2 Database, the environment variables should be modified:
+      # JDBC_DRIVER: org.h2.Driver
+      # JDBC_URL: jdbc:h2:/opt/solo/h2/db;MODE=MYSQL
+      # And the mysql service is no longer needed while using H2 Database.
+      # Refer to https://github.com/88250/solo for more details.
+      RUNTIME_DB: MYSQL
+      # These environment variables are same as what you set in the mysql service
+      JDBC_USERNAME: <db-username>
+      JDBC_PASSWORD: <db-password>
+      JDBC_DRIVER: com.mysql.cj.jdbc.Driver
+      JDBC_URL: jdbc:mysql://mysql:3306/solo?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      # Please modify following environment variables to your own settings
+      # If you visit the website by http://example.com:8888, the args should be:
+      # --server_scheme=http --server_host=example.com --server_port=8888
+      # P.S. server_port has default value 80 under http scheme and 443 under https scheme
+      # the listen_port is same as the port you set in the ports section
+    command: --listen_port=8080 --server_scheme=http --server_host=0.0.0.0 --server_port=
+    ports:
+      # modify the port 80 to any port you want
+      - 80:8080
+    volumes:
+      - /opt/solo/skins:/opt/solo/skins
+      - /opt/solo/plugins:/opt/solo/plugins
+      - /opt/solo/log2j2.xml:/opt/solo/log2j2.xml
+    networks:
+      - solo-net
+
+networks:
+  solo-net:
+    name: solo-internal
+    driver: bridge
